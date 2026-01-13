@@ -1,13 +1,13 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Image, Modal, TextInput } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { SwappySetup } from '../screens/swappypartner/swappysetup';
-import { ReviewsScreen } from '../screens/reviewscreen';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ProfileCompletionScreen } from '../components/profile/ProfileCompletionScreen';
 import { SettingsMenu } from '../components/profile/SettingsMenu';
 import { SocialMediaSettings } from '../components/profile/SocialMediaSettings';
-import { ProfileCompletionScreen } from '../components/profile/ProfileCompletionScreen';
+import { ReviewsScreen } from '../screens/reviewscreen';
+import { SwappySetup } from '../screens/swappypartner/swappysetup';
 
 interface SavedContent {
   readonly id: string;
@@ -61,7 +61,7 @@ interface QuickAction {
 }
 
 const LIBRARY_CATEGORIES: readonly LibraryCategory[] = [
-  { name: 'Coding', count: 12 },
+  { name: 'Coding', count: 11 },
   { name: 'Finance', count: 8 },
   { name: 'Writing', count: 6 },
   { name: 'Design', count: 5 },
