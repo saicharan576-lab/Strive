@@ -1,6 +1,6 @@
-import React from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import React from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface SettingsMenuProps {
   onSocialSettings: () => void;
@@ -13,6 +13,7 @@ interface SettingsMenuProps {
   };
   onNavigateToSwappySetup: () => void;
   onNavigateToInterestSelection: () => void;
+  onLogout: () => void;
 }
 
 interface SettingsMenuItemProps {
@@ -59,7 +60,8 @@ export const SettingsMenu = React.memo<SettingsMenuProps>(({
   socialMediaCount, 
   completion,
   onNavigateToSwappySetup,
-  onNavigateToInterestSelection
+  onNavigateToInterestSelection,
+  onLogout,
 }) => {
   return (
     <ScrollView style={styles.container}>
@@ -126,6 +128,7 @@ export const SettingsMenu = React.memo<SettingsMenuProps>(({
       <View style={styles.settingsSection}>
         <TouchableOpacity 
           style={styles.logoutButton}
+          onPress={onLogout}
           accessibilityRole="button"
           accessibilityLabel="Log out"
         >

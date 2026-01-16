@@ -1,32 +1,32 @@
-import React, { useState, useCallback } from 'react';
+import { createMaterialTopTabNavigator, MaterialTopTabBarProps } from '@react-navigation/material-top-tabs';
+import React, { useCallback, useState } from 'react';
 import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  FlatList,
-  ActivityIndicator,
-  RefreshControl,
-  Modal,
-  Dimensions,
+    ActivityIndicator,
+    Dimensions,
+    FlatList,
+    Modal,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { createMaterialTopTabNavigator, MaterialTopTabBarProps } from '@react-navigation/material-top-tabs';
 
 import SwappyFeed from '../screens/swappyfeed';
-import { 
-  SmartReactionPopup, 
-  TeachFunnelCTA, 
-  LearnFunnelCTA 
+import {
+    LearnFunnelCTA,
+    SmartReactionPopup,
+    TeachFunnelCTA
 } from '../screens/swappypartner/components';
 
 // Custom Hooks
-import { useAuth } from '../_hooks/useAuth';
+import { useAuth } from '../_context/AuthContext';
 import { usePosts } from '../_hooks/usePosts';
 
 // Components
-import { PostCard } from '../components/feed/PostCard';
 import { LoginScreen } from '../components/auth/LoginScreen';
+import { PostCard } from '../components/feed/PostCard';
 
 // Types
 import { Post, ReactionType } from '../_types/post';

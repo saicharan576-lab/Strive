@@ -1,20 +1,21 @@
-import React, { useState, useCallback, useRef, useMemo } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../_context/AuthContext';
 
 type LoginStep = 'credentials' | 'otp';
 
@@ -68,6 +69,24 @@ export function Login() {
   const [error, setError] = useState('');
   
   const otpInputs = useRef<Array<TextInput | null>>([]);
+  const { user, loading: authLoading, signInWithGoogle, error: authError } = useAuth();
+
+  // Display OAuth errors if any
+  useEffect(() => {
+    if (authError) {
+      setError(authError.message || 'Authentication failed. Please try again.');
+    }
+  }, [authError]);
+
+  const handleGoogleLogin = useCallback(async () => {
+    setError('');
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      console.error('Google login error:', err);
+      setError('Failed to connect. Please check your internet connection and try again.');
+    }
+  }, [signInWithGoogle]);
 
   const handleMobileChange = useCallback((value: string) => {
     const cleaned = value.replace(/\D/g, '').slice(0, MOBILE_LENGTH);
@@ -290,6 +309,34 @@ export function Login() {
                     <ActivityIndicator color="#fff" />
                   ) : (
                     <Text style={styles.buttonText}>Send OTP</Text>
+                  )}
+                </TouchableOpacity>
+
+                <View style={styles.dividerContainer}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>OR</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+
+                <TouchableOpacity
+                  onPress={handleGoogleLogin}
+                  disabled={authLoading}
+                  style={[
+                    styles.googleButton,
+                    authLoading && styles.buttonDisabled,
+                  ]}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Login with Google"
+                  accessibilityState={{ disabled: authLoading }}
+                >
+                  {authLoading ? (
+                    <ActivityIndicator color="#374151" />
+                  ) : (
+                    <>
+                      <Ionicons name="logo-google" size={20} color="#DB4437" />
+                      <Text style={styles.googleButtonText}>Continue with Google</Text>
+                    </>
                   )}
                 </TouchableOpacity>
 
@@ -638,6 +685,38 @@ const styles = StyleSheet.create({
   securityText: {
     fontSize: 12,
     color: '#7C3AED',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  dividerText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    paddingHorizontal: 12,
+    fontWeight: '500',
+  },
+  googleButton: {
+    height: 48,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  googleButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
   },
 });
 

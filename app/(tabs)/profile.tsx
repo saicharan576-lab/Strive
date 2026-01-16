@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import { Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../_context/AuthContext';
 import { ProfileCompletionScreen } from '../components/profile/ProfileCompletionScreen';
 import { SettingsMenu } from '../components/profile/SettingsMenu';
 import { SocialMediaSettings } from '../components/profile/SocialMediaSettings';
@@ -85,6 +86,7 @@ const ProfileScreen = React.memo<ProfileProps>(({
   onNavigateToReviews = () => {} 
 }) => {
   const router = useRouter();
+  const { signOut } = useAuth();
   
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsView, setSettingsView] = useState<'menu' | 'social'>('menu');
@@ -182,6 +184,19 @@ const ProfileScreen = React.memo<ProfileProps>(({
     router.push('/screens/Interestselection');
     setIsSettingsOpen(false);
   }, [router]);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      console.log('👤 Profile: Logout button clicked');
+      setIsSettingsOpen(false);
+      console.log('👤 Profile: Settings modal closed, calling signOut...');
+      await signOut();
+      console.log('👤 Profile: signOut completed, waiting for auth guard...');
+      // Navigation will be handled by the auth guard in _layout.tsx
+    } catch (error) {
+      console.error('❌ Profile: Logout error:', error);
+    }
+  }, [signOut]);
 
   const connectedCount = getConnectedCount();
 
@@ -353,6 +368,7 @@ const ProfileScreen = React.memo<ProfileProps>(({
               completion={completion}
               onNavigateToSwappySetup={handleOpenProfileCompletion}
               onNavigateToInterestSelection={handleOpenInterestSelection}
+              onLogout={handleLogout}
             />
           ) : (
             <SocialMediaSettings

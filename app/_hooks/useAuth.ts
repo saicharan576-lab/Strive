@@ -1,9 +1,10 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '@supabase/supabase-js';
 import * as AuthSession from 'expo-auth-session';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import { supabase } from '../supabaseConfig';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -15,30 +16,65 @@ export const useAuth = () => {
   const router = useRouter();
 
   useEffect(() => {
-    // Check active sessions and sets the user
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
+    // Check both Supabase session AND AsyncStorage for OTP-based login
+    const checkAuth = async () => {
+      try {
+        // First check Supabase session (Google OAuth)
+        const { data: { session } } = await supabase.auth.getSession();
+        
         if (session?.user) {
-          console.log('✅ Active session found for:', session.user.email);
+          console.log('✅ Active Supabase session found for:', session.user.email);
+          setUser(session.user);
+          setLoading(false);
+          return;
+        }
+
+        // If no Supabase session, check AsyncStorage for OTP login
+        const isLoggedIn = await AsyncStorage.getItem('isLoggedIn');
+        const hasCompletedOnboarding = await AsyncStorage.getItem('hasCompletedOnboarding');
+        const userMobile = await AsyncStorage.getItem('userMobile');
+        
+        if (isLoggedIn === 'true' && hasCompletedOnboarding === 'true' && userMobile) {
+          console.log('✅ Active OTP session found for:', userMobile);
+          // Create a mock user object for OTP-based login
+          setUser({
+            id: userMobile,
+            phone: userMobile,
+            aud: 'authenticated',
+            role: 'authenticated',
+            created_at: new Date().toISOString(),
+          } as User);
         } else {
           console.log('ℹ️ No active session');
+          setUser(null);
         }
-        setUser(session?.user ?? null);
+        
         setLoading(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error('❌ Session check error:', err);
         setError(err as Error);
         setLoading(false);
-      });
+      }
+    };
+
+    checkAuth();
+
+    // Set up an interval to periodically check AsyncStorage for OTP login updates
+    // This handles cases where AsyncStorage is updated (e.g., after completing onboarding)
+    const intervalId = setInterval(() => {
+      checkAuth();
+    }, 1000); // Check every second
 
     // Listen for changes on auth state
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('🔔 Auth state changed:', event);
       if (session?.user) {
         console.log('👤 User logged in:', session.user.email);
+        setUser(session?.user ?? null);
+      } else {
+        // If signed out from Supabase, recheck AsyncStorage
+        checkAuth();
       }
-      setUser(session?.user ?? null);
     });
 
     // Handle deep links for OAuth callback
@@ -87,6 +123,7 @@ export const useAuth = () => {
     });
 
     return () => {
+      clearInterval(intervalId);
       subscription?.unsubscribe();
       linkSubscription.remove();
     };
@@ -99,10 +136,12 @@ export const useAuth = () => {
 
       // Create OAuth redirect URL using Expo's proxy (more reliable than custom schemes)
       const redirectUrl = AuthSession.makeRedirectUri({
-        useProxy: true,
+        scheme: 'strive',
+        path: 'oauth-callback',
       });
 
-      console.log('Redirect URL:', redirectUrl);
+      console.log('🔗 Redirect URL:', redirectUrl);
+      console.log('📱 Platform:', Platform.OS);
 
       // Use Supabase's built-in OAuth method
       const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
@@ -113,13 +152,16 @@ export const useAuth = () => {
         }
       });
 
-      if (oauthError) throw oauthError;
+      if (oauthError) {
+        console.error('❌ OAuth initiation error:', oauthError);
+        throw oauthError;
+      }
 
       if (!data?.url) {
         throw new Error('No OAuth URL returned from Supabase');
       }
 
-      console.log('Opening OAuth URL:', data.url);
+      console.log('🌐 Opening OAuth URL:', data.url);
 
       // Open browser for OAuth and wait for result
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
@@ -192,9 +234,22 @@ export const useAuth = () => {
   const handleLogout = async () => {
     try {
       setLoading(true);
+      
+      // Sign out from Supabase
       await supabase.auth.signOut();
+      
+      // Clear AsyncStorage for OTP-based login
+      await Promise.all([
+        AsyncStorage.removeItem('isLoggedIn'),
+        AsyncStorage.removeItem('userMobile'),
+        AsyncStorage.removeItem('userEmail'),
+        AsyncStorage.removeItem('userInterests'),
+        AsyncStorage.removeItem('hasCompletedOnboarding'),
+      ]);
+      
       setUser(null);
       setError(null);
+      console.log('✅ User logged out successfully');
     } catch (err) {
       setError(err as Error);
       console.error('Logout error:', err);

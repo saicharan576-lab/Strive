@@ -1,18 +1,19 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  FlatList,
-  Dimensions,
-  ActivityIndicator,
-  ListRenderItem,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+    ActivityIndicator,
+    Dimensions,
+    FlatList,
+    ListRenderItem,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../_context/AuthContext';
 
 interface Category {
   readonly id: string;
@@ -137,6 +138,7 @@ const InterestSelection = React.memo(() => {
   const [selected, setSelected] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { refreshAuth } = useAuth();
 
   const toggleInterest = useCallback((id: string) => {
     setSelected(prev =>
@@ -154,6 +156,10 @@ const InterestSelection = React.memo(() => {
           AsyncStorage.setItem('userInterests', JSON.stringify(selected)),
           AsyncStorage.setItem('hasCompletedOnboarding', 'true'),
         ]);
+        
+        // Refresh auth state to pick up the new onboarding status
+        await refreshAuth();
+        
         // Navigate to home screen (index in tabs)
         router.replace('/(tabs)');
       } catch (error) {
@@ -161,7 +167,7 @@ const InterestSelection = React.memo(() => {
         setIsLoading(false);
       }
     }
-  }, [selected, router]);
+  }, [selected, router, refreshAuth]);
 
   const renderCategory: ListRenderItem<Category> = useCallback(({ item, index }) => (
     <CategoryCard
