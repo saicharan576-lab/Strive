@@ -4,6 +4,7 @@ import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { AppState, AppStateStatus, Linking, Platform } from 'react-native';
+import { clearUserProfile, getCachedUserProfile } from '../services/userProfileService';
 import { supabase } from '../supabaseConfig';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -44,16 +45,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       // If no Supabase session, check AsyncStorage for OTP login
-      const [isLoggedIn, hasCompletedOnboarding, userMobile] = await Promise.all([
+      const [isLoggedIn, hasCompletedOnboarding, userMobile, userProfile] = await Promise.all([
         AsyncStorage.getItem('isLoggedIn'),
         AsyncStorage.getItem('hasCompletedOnboarding'),
         AsyncStorage.getItem('userMobile'),
+        getCachedUserProfile(),
       ]);
       
       if (isLoggedIn === 'true' && hasCompletedOnboarding === 'true' && userMobile) {
         // Create a user object for OTP-based login
         setUser({
-          id: userMobile,
+          id: userProfile?.User_id || userMobile,
           phone: userMobile,
           aud: 'authenticated',
           role: 'authenticated',
@@ -185,15 +187,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await supabase.auth.signOut();
       console.log('✅ Supabase signOut complete');
       
-      // Clear AsyncStorage for OTP-based login
-      await Promise.all([
-        AsyncStorage.removeItem('isLoggedIn'),
-        AsyncStorage.removeItem('userMobile'),
-        AsyncStorage.removeItem('userEmail'),
-        AsyncStorage.removeItem('userInterests'),
-        AsyncStorage.removeItem('hasCompletedOnboarding'),
-      ]);
-      console.log('✅ AsyncStorage cleared');
+      // Clear user profile and all AsyncStorage data
+      await clearUserProfile();
+      console.log('✅ User profile and storage cleared');
       
       setUser(null);
       setError(null);

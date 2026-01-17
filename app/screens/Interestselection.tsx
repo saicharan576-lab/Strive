@@ -1,38 +1,70 @@
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Dimensions,
-    FlatList,
-    ListRenderItem,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  Image,
+  ListRenderItem,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../_context/AuthContext';
+import { getCachedUserProfile, saveUserInterests, updateUserInterests } from '../services/userProfileService';
+import { supabase } from '../supabaseConfig';
 
 interface Category {
   readonly id: string;
   readonly label: string;
   readonly emoji: string;
+  readonly iconUrl?: string;
+  readonly description?: string;
+  readonly colorCode?: string;
 }
 
-const CATEGORIES: readonly Category[] = [
-  { id: 'investing', label: 'Investing & Finance', emoji: '💰' },
-  { id: 'tech', label: 'Tech & Coding', emoji: '💻' },
-  { id: 'health', label: 'Health & Wellness', emoji: '🧘' },
-  { id: 'creative', label: 'Creative Skills', emoji: '🎨' },
-  { id: 'communication', label: 'Communication', emoji: '🗣️' },
-  { id: 'business', label: 'Business', emoji: '📈' },
-  { id: 'languages', label: 'Languages', emoji: '🌍' },
-  { id: 'productivity', label: 'Productivity', emoji: '⚡' },
-  { id: 'marketing', label: 'Marketing', emoji: '📱' },
-  { id: 'design', label: 'Design & UX', emoji: '✨' },
-] as const;
+// Emoji mapping for categories based on their names
+const getEmojiForCategory = (name: string): string => {
+  const lowerName = name.toLowerCase();
+  
+  // Direct matches
+  if (lowerName.includes('invest')) return '💰';
+  if (lowerName.includes('finance') || lowerName.includes('money')) return '💵';
+  if (lowerName.includes('tech') || lowerName.includes('technology')) return '💻';
+  if (lowerName.includes('coding') || lowerName.includes('programming')) return '👨‍💻';
+  if (lowerName.includes('health') || lowerName.includes('fitness')) return '🧘';
+  if (lowerName.includes('wellness') || lowerName.includes('meditation')) return '🧘‍♀️';
+  if (lowerName.includes('creative') || lowerName.includes('creativity')) return '🎨';
+  if (lowerName.includes('art') || lowerName.includes('drawing')) return '🎨';
+  if (lowerName.includes('communication') || lowerName.includes('speaking')) return '🗣️';
+  if (lowerName.includes('business') || lowerName.includes('entrepreneur')) return '📈';
+  if (lowerName.includes('language') || lowerName.includes('translation')) return '🌍';
+  if (lowerName.includes('productivity') || lowerName.includes('organization')) return '⚡';
+  if (lowerName.includes('marketing') || lowerName.includes('advertis')) return '📱';
+  if (lowerName.includes('design')) return '✨';
+  if (lowerName.includes('ux') || lowerName.includes('ui')) return '🖥️';
+  if (lowerName.includes('music') || lowerName.includes('audio')) return '🎵';
+  if (lowerName.includes('video') || lowerName.includes('film')) return '🎬';
+  if (lowerName.includes('photo')) return '📸';
+  if (lowerName.includes('writing') || lowerName.includes('content')) return '✍️';
+  if (lowerName.includes('cooking') || lowerName.includes('food')) return '🍳';
+  if (lowerName.includes('travel')) return '✈️';
+  if (lowerName.includes('sport') || lowerName.includes('athletic')) return '⚽';
+  if (lowerName.includes('science')) return '🔬';
+  if (lowerName.includes('math')) return '🔢';
+  if (lowerName.includes('reading') || lowerName.includes('book')) return '📚';
+  if (lowerName.includes('gaming') || lowerName.includes('game')) return '🎮';
+  if (lowerName.includes('fashion') || lowerName.includes('style')) return '👗';
+  if (lowerName.includes('teach') || lowerName.includes('education')) return '👨‍🏫';
+  if (lowerName.includes('data') || lowerName.includes('analytics')) return '📊';
+  if (lowerName.includes('ai') || lowerName.includes('machine learning')) return '🤖';
+  
+  return '📚'; // Default fallback emoji
+};
 
 const MINIMUM_SELECTION = 3 as const;
 const NUM_COLUMNS = 2 as const;
@@ -62,18 +94,27 @@ interface CategoryCardProps {
 
 const CategoryCard = React.memo<CategoryCardProps>(({ item, index, isSelected, onToggle }) => {
   const isLeftColumn = index % NUM_COLUMNS === 0;
+  const [imageError, setImageError] = useState(false);
 
   const handlePress = useCallback(() => {
     onToggle(item.id);
   }, [item.id, onToggle]);
+
+  // Use color_code from database or default purple
+  const borderColor = isSelected ? (item.colorCode || '#8A2BE2') : '#E5E5E5';
+  const backgroundColor = isSelected ? `${item.colorCode || '#8A2BE2'}15` : '#fff';
 
   return (
     <TouchableOpacity
       onPress={handlePress}
       style={[
         styles.categoryCard,
-        { width: ITEM_WIDTH, marginRight: isLeftColumn ? 12 : 0 },
-        isSelected ? styles.categoryCardSelected : styles.categoryCardDefault,
+        { 
+          width: ITEM_WIDTH, 
+          marginRight: isLeftColumn ? 12 : 0,
+          borderColor,
+          backgroundColor,
+        },
       ]}
       activeOpacity={0.7}
       accessibilityRole="button"
@@ -82,11 +123,27 @@ const CategoryCard = React.memo<CategoryCardProps>(({ item, index, isSelected, o
       accessibilityHint={isSelected ? 'Double tap to deselect' : 'Double tap to select'}
     >
       {isSelected && (
-        <View style={styles.checkmarkContainer}>
+        <View style={[styles.checkmarkContainer, { backgroundColor: item.colorCode || '#8A2BE2' }]}>
           <Ionicons name="checkmark" size={14} color="#fff" />
         </View>
       )}
-      <Text style={styles.categoryEmoji}>{item.emoji}</Text>
+      {item.iconUrl && !imageError ? (
+        <Image 
+          source={{ uri: item.iconUrl }} 
+          style={styles.categoryIcon}
+          resizeMode="contain"
+          onError={(e) => {
+            console.log('Image load error for', item.label, ':', e.nativeEvent.error);
+            console.log('Icon URL:', item.iconUrl);
+            setImageError(true);
+          }}
+          onLoad={() => {
+            console.log('Image loaded successfully for', item.label);
+          }}
+        />
+      ) : (
+        <Text style={styles.categoryEmoji}>{item.emoji}</Text>
+      )}
       <Text style={styles.categoryLabel} numberOfLines={2}>
         {item.label}
       </Text>
@@ -136,9 +193,84 @@ Footer.displayName = 'Footer';
 // Main Component
 const InterestSelection = React.memo(() => {
   const [selected, setSelected] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingCategories, setIsFetchingCategories] = useState(true);
+  const [isUpdatingInterests, setIsUpdatingInterests] = useState(false);
   const router = useRouter();
   const { refreshAuth } = useAuth();
+
+  // Fetch categories from Supabase on mount
+  useEffect(() => {
+    fetchCategories();
+    loadExistingInterests();
+  }, []);
+
+  // Load existing interests if user is updating from profile
+  const loadExistingInterests = async () => {
+    try {
+      const userProfile = await getCachedUserProfile();
+      if (userProfile) {
+        // Check if user has existing interests in database
+        const existingInterests: string[] = [];
+        if (userProfile.Interest_cat_1) existingInterests.push(userProfile.Interest_cat_1);
+        if (userProfile.Interest_cat_2) existingInterests.push(userProfile.Interest_cat_2);
+        if (userProfile.Interest_cat_3) existingInterests.push(userProfile.Interest_cat_3);
+        
+        if (existingInterests.length > 0) {
+          setSelected(existingInterests);
+          setIsUpdatingInterests(true);
+          console.log('📋 Loaded existing interests:', existingInterests);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading existing interests:', error);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      setIsFetchingCategories(true);
+      
+      const { data, error } = await supabase
+        .from('Skill_Categories')
+        .select('id, Display_name, Description, icon_url, color_code, Name, rank_order')
+        .eq('is-active', true)
+        .order('rank_order', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching categories:', error);
+        Alert.alert('Error', 'Failed to load categories. Please try again.');
+        return;
+      }
+
+      console.log('📊 Fetched categories from Supabase:', data);
+
+      if (data && data.length > 0) {
+        // Transform database records to Category interface
+        const transformedCategories: Category[] = data.map(item => {
+          console.log(`Category: ${item.Display_name}, Icon URL: ${item.icon_url}`);
+          return {
+            id: item.id.toString(),
+            label: item.Display_name,
+            iconUrl: item.icon_url || undefined,
+            emoji: getEmojiForCategory(item.Name || item.Display_name),
+            description: item.Description || undefined,
+            colorCode: item.color_code || undefined,
+          };
+        });
+
+        setCategories(transformedCategories);
+      } else {
+        Alert.alert('No Categories', 'No active categories found.');
+      }
+    } catch (error) {
+      console.error('Exception fetching categories:', error);
+      Alert.alert('Error', 'An unexpected error occurred.');
+    } finally {
+      setIsFetchingCategories(false);
+    }
+  };
 
   const toggleInterest = useCallback((id: string) => {
     setSelected(prev =>
@@ -152,22 +284,49 @@ const InterestSelection = React.memo(() => {
     if (selected.length >= MINIMUM_SELECTION) {
       setIsLoading(true);
       try {
-        await Promise.all([
-          AsyncStorage.setItem('userInterests', JSON.stringify(selected)),
-          AsyncStorage.setItem('hasCompletedOnboarding', 'true'),
-        ]);
+        // Get user profile from cache
+        const userProfile = await getCachedUserProfile();
+        
+        if (!userProfile) {
+          Alert.alert('Error', 'User profile not found. Please log in again.');
+          setIsLoading(false);
+          router.replace('/Login');
+          return;
+        }
+
+        // Use updateUserInterests if editing, saveUserInterests if first time
+        const success = isUpdatingInterests
+          ? await updateUserInterests(userProfile.User_id, selected)
+          : await saveUserInterests(userProfile.User_id, selected);
+
+        if (!success) {
+          Alert.alert('Error', 'Failed to save interests. Please try again.');
+          setIsLoading(false);
+          return;
+        }
+
+        console.log('✅ Interests saved successfully');
         
         // Refresh auth state to pick up the new onboarding status
         await refreshAuth();
         
-        // Navigate to home screen (index in tabs)
-        router.replace('/(tabs)');
+        // Navigate based on context
+        if (isUpdatingInterests) {
+          // User is updating from profile, go back
+          Alert.alert('Success', 'Your interests have been updated!', [
+            { text: 'OK', onPress: () => router.back() }
+          ]);
+        } else {
+          // New user completing onboarding, go to home
+          router.replace('/(tabs)');
+        }
       } catch (error) {
         console.error('Error saving interests:', error);
+        Alert.alert('Error', 'Failed to save interests. Please try again.');
         setIsLoading(false);
       }
     }
-  }, [selected, router, refreshAuth]);
+  }, [selected, router, refreshAuth, isUpdatingInterests]);
 
   const renderCategory: ListRenderItem<Category> = useCallback(({ item, index }) => (
     <CategoryCard
@@ -191,12 +350,34 @@ const InterestSelection = React.memo(() => {
 
   const selectedCount = useMemo(() => selected.length, [selected.length]);
 
+  // Show loading spinner while fetching categories
+  if (isFetchingCategories) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerContent]} edges={['top', 'bottom']}>
+        <ActivityIndicator size="large" color="#8A2BE2" />
+        <Text style={styles.loadingText}>Loading categories...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Show message if no categories available
+  if (categories.length === 0) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerContent]} edges={['top', 'bottom']}>
+        <Text style={styles.emptyText}>No categories available</Text>
+        <TouchableOpacity onPress={fetchCategories} style={styles.retryButton}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <Header />
 
       <FlatList
-        data={CATEGORIES}
+        data={categories}
         renderItem={renderCategory}
         keyExtractor={keyExtractor}
         numColumns={NUM_COLUMNS}
@@ -228,6 +409,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   header: {
     paddingHorizontal: 24,
     paddingTop: 32,
@@ -257,14 +442,6 @@ const styles = StyleSheet.create({
     position: 'relative',
     marginBottom: 0,
   },
-  categoryCardDefault: {
-    borderColor: '#E5E5E5',
-    backgroundColor: '#fff',
-  },
-  categoryCardSelected: {
-    borderColor: '#8A2BE2',
-    backgroundColor: '#F5F0FF',
-  },
   checkmarkContainer: {
     position: 'absolute',
     top: 8,
@@ -272,9 +449,13 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#8A2BE2',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  categoryIcon: {
+    width: 32,
+    height: 32,
+    marginBottom: 6,
   },
   categoryEmoji: {
     fontSize: 24,
@@ -310,6 +491,27 @@ const styles = StyleSheet.create({
   continueButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#8A2BE2',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '600',
   },
 });

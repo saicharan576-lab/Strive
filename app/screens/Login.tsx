@@ -3,19 +3,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../_context/AuthContext';
+import { createOrGetUserProfile } from '../services/userProfileService';
 
 type LoginStep = 'credentials' | 'otp';
 
@@ -157,15 +158,38 @@ export function Login() {
       // Example: await verifyOTP({ mobile: mobileNumber, otp: otpValue });
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      await Promise.all([
-        AsyncStorage.setItem('isLoggedIn', 'true'),
-        AsyncStorage.setItem('userMobile', mobileNumber),
-        email ? AsyncStorage.setItem('userEmail', email) : Promise.resolve(),
-      ]);
+      console.log('✅ OTP verified successfully');
+
+      // After successful OTP verification, create or get user profile
+      const userProfile = await createOrGetUserProfile(mobileNumber);
+
+      if (!userProfile) {
+        setError('Failed to create user profile. Please try again.');
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('✅ User profile ready:', userProfile.User_id);
+
+      // Store login state
+      await AsyncStorage.setItem('isLoggedIn', 'true');
+      
+      if (email) {
+        await AsyncStorage.setItem('userEmail', email);
+      }
       
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      router.replace('/screens/Interestselection');
+      // Check if user has completed onboarding
+      const hasCompletedOnboarding = await AsyncStorage.getItem('hasCompletedOnboarding');
+
+      if (hasCompletedOnboarding === 'true') {
+        console.log('🎯 User has completed onboarding, navigating to home');
+        router.replace('/(tabs)');
+      } else {
+        console.log('📋 User needs to complete onboarding');
+        router.replace('/screens/Interestselection');
+      }
     } catch (err) {
       console.error('Login error:', err);
       setError('Verification failed. Please try again.');
