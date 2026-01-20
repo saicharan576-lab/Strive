@@ -3,16 +3,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../_context/AuthContext';
@@ -70,7 +70,7 @@ export function Login() {
   const [error, setError] = useState('');
   
   const otpInputs = useRef<Array<TextInput | null>>([]);
-  const { user, loading: authLoading, signInWithGoogle, error: authError } = useAuth();
+  const { user, loading: authLoading, signInWithGoogle, refreshAuth, error: authError } = useAuth();
 
   // Display OAuth errors if any
   useEffect(() => {
@@ -180,14 +180,22 @@ export function Login() {
       
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Check if user has completed onboarding
-      const hasCompletedOnboarding = await AsyncStorage.getItem('hasCompletedOnboarding');
+      // Check if user has completed onboarding by checking if they have interests saved
+      const hasInterests = userProfile.Interest_cat_1 || userProfile.Interest_cat_2 || userProfile.Interest_cat_3;
 
-      if (hasCompletedOnboarding === 'true') {
-        console.log('🎯 User has completed onboarding, navigating to home');
+      if (hasInterests) {
+        // User has completed onboarding, mark it in AsyncStorage
+        await AsyncStorage.setItem('hasCompletedOnboarding', 'true');
+        console.log('🎯 User has completed onboarding (has interests), navigating to home');
+        
+        // Refresh auth state before navigating
+        await refreshAuth();
         router.replace('/(tabs)');
       } else {
-        console.log('📋 User needs to complete onboarding');
+        console.log('📋 User needs to complete onboarding (no interests found)');
+        
+        // Refresh auth state before navigating
+        await refreshAuth();
         router.replace('/screens/Interestselection');
       }
     } catch (err) {
