@@ -290,7 +290,7 @@ const InterestSelection = React.memo(() => {
         if (!userProfile) {
           Alert.alert('Error', 'User profile not found. Please log in again.');
           setIsLoading(false);
-          router.replace('/Login');
+          router.replace('./Login');
           return;
         }
 

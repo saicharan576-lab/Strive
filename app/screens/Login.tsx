@@ -68,6 +68,7 @@ export function Login() {
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resendTimer, setResendTimer] = useState(0);
   
   const otpInputs = useRef<Array<TextInput | null>>([]);
   const { user, loading: authLoading, signInWithGoogle, refreshAuth, error: authError } = useAuth();
@@ -78,6 +79,19 @@ export function Login() {
       setError(authError.message || 'Authentication failed. Please try again.');
     }
   }, [authError]);
+
+  // Countdown timer for resend OTP
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | undefined;
+    if (resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [resendTimer]);
 
   const handleGoogleLogin = useCallback(async () => {
     setError('');
@@ -114,6 +128,7 @@ export function Login() {
       
       setStep('otp');
       setError('');
+      setResendTimer(60); // Start 60 second countdown
       
       // Focus first OTP input after a short delay
       setTimeout(() => otpInputs.current[0]?.focus(), 300);
@@ -219,6 +234,7 @@ export function Login() {
       // TODO: Replace with actual API call
       await new Promise(resolve => setTimeout(resolve, 1000));
       
+      setResendTimer(60); // Restart 60 second countdown
       setTimeout(() => otpInputs.current[0]?.focus(), 300);
     } catch (err) {
       console.error('Error resending OTP:', err);
@@ -449,14 +465,16 @@ export function Login() {
                 <View style={styles.resendContainer}>
                   <TouchableOpacity
                     onPress={handleResendOTP}
-                    disabled={isLoading}
-                    style={[isLoading && styles.linkDisabled]}
+                    disabled={isLoading || resendTimer > 0}
+                    style={[(isLoading || resendTimer > 0) && styles.linkDisabled]}
                     accessibilityRole="button"
-                    accessibilityLabel="Resend OTP"
-                    accessibilityState={{ disabled: isLoading }}
+                    accessibilityLabel={resendTimer > 0 ? `Wait ${resendTimer} seconds to resend OTP` : "Resend OTP"}
+                    accessibilityState={{ disabled: isLoading || resendTimer > 0 }}
                   >
-                    <Text style={styles.linkText}>
-                      Didn't receive the code? Resend OTP
+                    <Text style={[styles.linkText, (isLoading || resendTimer > 0) && styles.linkTextDisabled]}>
+                      {resendTimer > 0 
+                        ? `Resend OTP in ${resendTimer}s` 
+                        : "Didn't receive the code? Resend OTP"}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -698,6 +716,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8B5CF6',
     fontWeight: '500',
+  },
+  linkTextDisabled: {
+    color: '#9CA3AF',
   },
   linkDisabled: {
     opacity: 0.5,
