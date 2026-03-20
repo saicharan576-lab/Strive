@@ -30,20 +30,27 @@ export const createOrGetUserProfile = async (
   try {
     console.log('🔍 Checking profile for mobile:', mobileNumber);
 
-    // First, check if profile already exists
+    // Check if profile already exists
     const { data: existingProfile, error: fetchError } = await supabase
       .from('User_Profile')
       .select('*')
       .eq('Mobile_number', mobileNumber)
       .maybeSingle();
 
-    if (existingProfile && !fetchError) {
+    if (fetchError) {
+      console.error('❌ Error fetching profile:', fetchError.message);
+      throw fetchError;
+    }
+
+    if (existingProfile) {
       console.log('✅ Existing profile found:', existingProfile.User_id);
       
-      // Store profile in AsyncStorage
-      await AsyncStorage.setItem('userProfile', JSON.stringify(existingProfile));
-      await AsyncStorage.setItem('userId', existingProfile.User_id);
-      await AsyncStorage.setItem('userMobile', mobileNumber);
+      // Store profile in AsyncStorage in parallel
+      await Promise.all([
+        AsyncStorage.setItem('userProfile', JSON.stringify(existingProfile)),
+        AsyncStorage.setItem('userId', existingProfile.User_id),
+        AsyncStorage.setItem('userMobile', mobileNumber)
+      ]);
       
       return existingProfile;
     }
@@ -72,14 +79,16 @@ export const createOrGetUserProfile = async (
 
     console.log('✅ New profile created:', createdProfile.User_id);
 
-    // Store profile in AsyncStorage
-    await AsyncStorage.setItem('userProfile', JSON.stringify(createdProfile));
-    await AsyncStorage.setItem('userId', createdProfile.User_id);
-    await AsyncStorage.setItem('userMobile', mobileNumber);
+    // Store profile in AsyncStorage in parallel
+    await Promise.all([
+      AsyncStorage.setItem('userProfile', JSON.stringify(createdProfile)),
+      AsyncStorage.setItem('userId', createdProfile.User_id),
+      AsyncStorage.setItem('userMobile', mobileNumber)
+    ]);
 
     return createdProfile;
   } catch (error) {
-    console.error('Exception in createOrGetUserProfile:', error);
+    console.error('❌ Exception in createOrGetUserProfile:', error);
     return null;
   }
 };

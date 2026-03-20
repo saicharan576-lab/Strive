@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Post } from '../_types/post';
+import { Post, PostType } from '../_types/post';
 import { supabase } from '../supabaseConfig';
+
+/** Derive post type from thumbnail URL or explicit field */
+const derivePostType = (thumbnail: string | null | undefined): PostType => {
+  if (!thumbnail) return 'text';
+  const lower = thumbnail.toLowerCase();
+  if (lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.webm') || lower.includes('video')) {
+    return 'video';
+  }
+  return 'image';
+};
 
 export const usePosts = () => {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -47,14 +57,15 @@ export const usePosts = () => {
       const postsData: Post[] = (data || []).map(post => ({
         id: post.id,
         username: post.username || 'Anonymous',
-        avatar: post.avatar || 'A',
-        thumbnail: post.thumbnail || '',
+        avatar: post.avatar || '',
+        thumbnail: post.thumbnail || null,
         title: post.title || 'Untitled',
         description: post.description,
         likes: post.likes || 0,
         comments: post.comments || 0,
         createdAt: post.created_at ? new Date(post.created_at) : new Date(),
         tags: post.tags,
+        type: derivePostType(post.thumbnail),
       }));
 
       setPosts(postsData);

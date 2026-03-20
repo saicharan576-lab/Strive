@@ -176,24 +176,33 @@ export function Login() {
       console.log('✅ OTP verified successfully');
 
       // After successful OTP verification, create or get user profile
+      console.log('🔄 Fetching user profile...');
       const userProfile = await createOrGetUserProfile(mobileNumber);
 
       if (!userProfile) {
-        setError('Failed to create user profile. Please try again.');
+        console.error('❌ Failed to fetch or create user profile');
+        setError('Unable to connect to server. Please check your internet connection.');
+        Alert.alert(
+          'Connection Error',
+          'Unable to connect to the server. Please check:\n\n• Your internet connection\n• Try again in a moment\n\nIf the problem persists, contact support.',
+          [{ text: 'OK' }]
+        );
         setIsLoading(false);
         return;
       }
 
       console.log('✅ User profile ready:', userProfile.User_id);
 
-      // Store login state
-      await AsyncStorage.setItem('isLoggedIn', 'true');
+      // Store login state and email in parallel
+      const storagePromises = [
+        AsyncStorage.setItem('isLoggedIn', 'true')
+      ];
       
       if (email) {
-        await AsyncStorage.setItem('userEmail', email);
+        storagePromises.push(AsyncStorage.setItem('userEmail', email));
       }
       
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await Promise.all(storagePromises);
       
       // Check if user has completed onboarding by checking if they have interests saved
       const hasInterests = userProfile.Interest_cat_1 || userProfile.Interest_cat_2 || userProfile.Interest_cat_3;

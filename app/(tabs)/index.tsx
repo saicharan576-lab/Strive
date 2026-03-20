@@ -1,23 +1,23 @@
 import { createMaterialTopTabNavigator, MaterialTopTabBarProps } from '@react-navigation/material-top-tabs';
 import React, { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    Dimensions,
-    FlatList,
-    Modal,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  Modal,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import SwappyFeed from '../screens/swappyfeed';
 import {
-    LearnFunnelCTA,
-    SmartReactionPopup,
-    TeachFunnelCTA
+  LearnFunnelCTA,
+  SmartReactionPopup,
+  TeachFunnelCTA
 } from '../screens/swappypartner/components';
 
 // Custom Hooks
@@ -182,6 +182,7 @@ const FeedyScreen = React.memo(() => {
   const [selectedPostForReaction, setSelectedPostForReaction] = useState<string | null>(null);
   const [funnelCTAType, setFunnelCTAType] = useState<'teach' | 'learn' | null>(null);
   const [funnelCTATopic, setFunnelCTATopic] = useState('');
+  const [reactions, setReactions] = useState<Record<string, ReactionType | null>>({});
 
   const handlePostLongPress = useCallback((postId: string) => {
     setSelectedPostForReaction(postId);
@@ -191,6 +192,14 @@ const FeedyScreen = React.memo(() => {
   const handleReactionSelect = useCallback((action: ReactionType) => {
     const post = posts.find(p => p.id === selectedPostForReaction);
     const topic = post?.title || '';
+
+    // Store reaction for the post
+    if (selectedPostForReaction) {
+      setReactions(prev => ({
+        ...prev,
+        [selectedPostForReaction]: action,
+      }));
+    }
     
     if (action === 'teach') {
       setFunnelCTAType('teach');
@@ -214,12 +223,21 @@ const FeedyScreen = React.memo(() => {
     setFunnelCTATopic('');
   }, []);
 
+  const handleQuickReact = useCallback((postId: string) => {
+    setReactions(prev => ({
+      ...prev,
+      [postId]: prev[postId] === 'insightful' ? null : 'insightful',
+    }));
+  }, []);
+
   const renderPost = useCallback(({ item }: { item: Post }) => (
     <PostCard
       post={item}
       onLongPress={handlePostLongPress}
+      activeReaction={reactions[item.id] || null}
+      onReact={handleQuickReact}
     />
-  ), [handlePostLongPress]);
+  ), [handlePostLongPress, reactions, handleQuickReact]);
 
   const keyExtractor = useCallback((item: Post) => item.id, []);
 
@@ -300,7 +318,7 @@ FeedNavigator.displayName = 'FeedNavigator';
 
 // Main Component
 export default function HomeScreen() {
-  const { user, loading, handleLogin } = useAuth();
+  const { user, loading, signInWithGoogle } = useAuth();
 
   if (loading) {
     return (
@@ -311,7 +329,7 @@ export default function HomeScreen() {
   }
 
   if (!user) {
-    return <LoginScreen onLogin={handleLogin} loading={loading} />;
+    return <LoginScreen onLogin={signInWithGoogle} loading={loading} />;
   }
 
   return (
